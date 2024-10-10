@@ -1,0 +1,118 @@
+
+using System.Diagnostics;
+using Newtonsoft.Json;
+using fileCompareWithList.Model;
+
+
+namespace fileCompareWithList
+{
+    public partial class Form1 : Form
+    {
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        public static void AppendColoredText(RichTextBox box, string text, Color color)
+        {
+            box.SelectionStart = box.TextLength;
+            box.SelectionLength = 0;
+            box.SelectionColor = color;
+            box.AppendText(text);
+            box.SelectionColor = box.ForeColor; // Reset color to default
+        }
+
+        private void btnOpen_Click(object sender, EventArgs e)
+        {
+            using (OpenFileDialog openFileDialog = new OpenFileDialog())
+            {
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    string originalFilePath = openFileDialog.FileName;
+                    string text = File.ReadAllText(originalFilePath);
+
+                    AppList appList = JsonConvert.DeserializeObject<AppList>(text);
+
+                    string displayText = JsonConvert.SerializeObject(appList, Formatting.Indented);
+
+                    txtDisplay.Text = $"Path: {originalFilePath}{Environment.NewLine}" +
+                                      $"Contents:{Environment.NewLine}{displayText}{Environment.NewLine}____{Environment.NewLine}";
+
+                    foreach (var app in appList.Applications)
+                    {
+                        string filePath = Path.Combine(appList.Path, app.Name);
+
+                        if (File.Exists(filePath))
+                        {
+                            FileInfo fileInfo = new FileInfo(filePath);
+                            double size = fileInfo.Length / 1024 + 1;
+                            string fileVersion = "N/A";
+                            try
+                            {
+                                fileVersion = FileVersionInfo.GetVersionInfo(filePath).FileVersion ?? "N/A";
+                            }
+                            catch
+                            {
+                                // Ignore errors when retrieving version info
+                            }
+
+                            string fileDetails = $"Version: {fileVersion}{Environment.NewLine}" +
+                                                 $" Size: {size} KB{Environment.NewLine}";
+
+                            ListViewItem lvitem = new ListViewItem(app.Name);
+                            lvitem.SubItems.Add(fileDetails);
+
+                            bool vMatch = fileVersion.Equals(app.Version);
+                            bool sMatch = (fileInfo.Length / 1024 + 1) == app.Size;
+
+                            string versionResult = $"Version Match: {vMatch} {(vMatch ? "✔" : "✘")}{Environment.NewLine}";
+                            string sizeResult = $"Size Match: {sMatch} {(sMatch ? "✔" : "✘")}{Environment.NewLine}";
+
+                            lvitem.SubItems.Add(versionResult);
+                            lvitem.SubItems.Add(sizeResult);
+
+                            lvitem.UseItemStyleForSubItems = false;
+                            lvitem.SubItems[2].ForeColor = vMatch ? Color.Green : Color.Red;
+                            lvitem.SubItems[3].ForeColor = sMatch ? Color.Green : Color.Red;
+
+                           
+
+                            listView1.Items.Add(lvitem);
+                        }
+                        else
+                        {
+                            ListViewItem lvitem = new ListViewItem(app.Name);// first column
+                            string notFoundFile = "File does not exist.";
+                            string notApplicable = "N/A";
+                            lvitem.SubItems.Add(notFoundFile);//second column
+                            lvitem.SubItems.Add(notApplicable);//third column
+                            lvitem.SubItems.Add(notApplicable);//fourth column
+
+                            //lvitem.ForeColor = Color.Red;
+                            lvitem.SubItems[0].ForeColor = Color.Goldenrod;
+                            lvitem.SubItems[1].ForeColor = Color.Goldenrod;
+                            lvitem.SubItems[2].ForeColor = Color.Goldenrod;
+                            lvitem.SubItems[3].ForeColor = Color.Goldenrod;
+
+                            listView1.Items.Add(lvitem);//because of this line everything is added/written to your listview
+                            //applies only to the above(the last row)
+                        }
+                    }
+
+                    richTextBox1.Clear();
+                    AppendColoredText(richTextBox1, "Green - True", Color.Green);
+                    AppendColoredText(richTextBox1, Environment.NewLine + Environment.NewLine, richTextBox1.ForeColor);
+                    AppendColoredText(richTextBox1, "Red - False", Color.Red);
+                }
+                else
+                {
+                    MessageBox.Show("Please open a file first.");
+                }
+            }
+        }
+    }
+}
+//Key Adjustments:
+//Class Definitions: Added Application and AppList classes to match the JSON structure.
+//File Path Combination: Combined appList.Path with app.Name to get the full file path.
+//Deserialization: Used JsonConvert.DeserializeObject<AppList>(text) to deserialize the JSON content
